@@ -1,0 +1,224 @@
+---
+- hosts: all
+  become: true
+  tasks:
+
+  - name: install packages
+    yum:
+      name: "{{ packages }}"
+      state: present
+    vars:
+      packages:
+      - bind
+      - bind-utils
+      - mc
+      - nano
+      - ntp
+      #- policycoreutils-python
+      
+  - name: Ставим временную зону.
+    timezone:
+      name: Europe/Moscow
+
+
+
+- hosts: ns01
+  become: true
+  tasks:
+  - name: copy named.conf  ##################################
+    copy:
+      src: config/master/master-named.conf
+      dest: /etc/named.conf
+      owner: root
+      group: named
+      mode: 0640
+
+  - name: copy zones  ################################
+    copy:    
+      src: "{{ item }}"
+      dest: /var/named/
+      owner: root
+      group: named
+      mode:    0660
+    with_fileglob:
+      - config/master/named.dns*
+
+
+  - name: copy resolv.conf to the servers # настройки доменных имен ##############
+    copy:
+      src: config/master/servers-resolv.conf
+      dest: /etc/resolv.conf
+      owner: root
+      group: root
+      mode: 0644
+
+  - name: copy dynamic zone ddns.lab ###################################
+    copy:
+      src: config/master/named.ddns.lab
+      dest: /var/named/dynamic/
+      owner: root
+      group: named
+      mode: 0660
+
+  - name: copy master zone newdns.lab ###################################
+    copy:
+      src: config/master/named.newdns.lab
+      dest: /var/named/
+      owner: root
+      group: named
+      mode: 0660
+
+  - name: copy rev zones  #####################################
+    copy:
+      src: config/master/named.50.168.192.rev
+      dest: /var/named/
+      owner: root
+      group: named
+      mode: 0660
+
+  - name: Копируем transferkey на все сервера и клиенты # проверить по итогу
+    copy:
+      src: config/named.zonetransfer.key
+      dest: /etc/named.zonetransfer.key
+      owner: named
+      group: named
+      mode: 0644
+
+  - name: set /etc/named permissions
+    file:
+      path: /etc/named
+      owner: root
+      group: named
+      mode: 0670
+
+ # - name:  # разрешение на named
+ #   file: 
+       #path: /etc/named 
+       #owner: root
+       #group: named
+       #mode: 0670
+    
+ # - name: allow to change master zone file # SeLinix 
+ #   shell: setsebool -P named_write_master_zones 1
+    
+ # - name: make named permissive for SELinux # SeLinix 
+ #   shell: semanage permissive -a named_t
+    
+ # - name: apply new SELinux file context to filesystem # SeLinix 
+ #   shell: restorecon -irv /etc/named/
+
+  - name: ensure named is running and enabled
+    systemd:
+      name: named
+      state: restarted
+      enabled: yes
+
+- hosts: ns02
+  become: true
+  tasks:
+  - name: copy named.conf ###################################
+    copy:
+      src: config/slave/slave-named.conf
+      dest: /etc/named.conf
+      owner: root
+      group: named
+      mode: 0640
+
+  - name: copy resolv.conf to the server
+    copy:
+      src: config/slave/resolv.conf
+      dest: /etc/resolv.conf
+      owner: root
+      group: root
+      mode: 0644
+
+  - name: Копируем transferkey на все сервера и клиенты # проверить по итогу
+    copy:
+      src: config/named.zonetransfer.key
+      dest: /etc/named.zonetransfer.key
+      owner: named
+      group: named
+      mode: 0644
+
+  - name: set /etc/named permissions
+    file:
+      path: /etc/named
+      owner: root
+      group: named
+      mode: 0670
+
+
+#  - name: allow to change master zone file # SeLinix 
+#    shell: setsebool -P named_write_master_zones 1
+    
+#  - name: make named permissive for SELinux # SeLinix
+#    shell: semanage permissive -a named_t
+    
+#  - name: apply new SELinux file context to filesystem # SeLinix
+#    shell: restorecon -irv /etc/named/
+
+  - name: ensure named is running and enabled
+    systemd:
+      name: named
+      state: restarted
+      enabled: yes 
+    
+- hosts: client1
+  become: true
+  tasks:
+  - name: copy resolv.conf to the client #######################
+    copy:
+      src: config/client1/client-resolv.conf
+      dest: /etc/resolv.conf
+      owner: root
+      group: root
+      mode: 0644
+
+  - name: copy rndc conf file #######################
+    copy:
+      src: config/client1/rndc.conf
+      dest: /home/vagrant/rndc.conf
+      owner: vagrant
+      group: vagrant
+      mode: 0644
+      
+  - name: Копируем transferkey на все сервера и клиенты # проверить по итогу
+    copy:
+      src: config/named.zonetransfer.key
+      dest: /etc/named.zonetransfer.key
+      owner: named
+      group: named
+      mode: 0644
+      
+  - name: copy motd to the client  ################# 
+    copy:
+      src: config/client1/client-motd
+      dest: /etc/motd
+      owner: root
+      group: root
+      mode: 0644
+
+
+- hosts: client2
+  become: true
+  tasks:
+  - name: copy resolv.conf to the client ##################
+    copy:
+      src:  config/client2/client-resolv.conf
+      dest: /etc/resolv.conf
+      owner: root
+      group: root
+      mode: 0644
+      
+  - name: Копируем transferkey на все сервера и клиенты # проверить по итогу
+    copy:
+      src: config/named.zonetransfer.key
+      dest: /etc/named.zonetransfer.key
+      owner: named
+      group: named
+      mode: 0644
+    
+    
+    
+    
+    
